@@ -29,6 +29,13 @@
       "when": 1775414000000,
       "tag": "0003_analytics_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1775415000000,
+      "tag": "0004_fix_analytics_metadata",
+      "breakpoints": true
     }
   ]
 }
