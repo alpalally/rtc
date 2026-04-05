@@ -6,6 +6,7 @@ import { eq, sql, desc } from 'drizzle-orm';
 export const adminRouter = Router();
 
 adminRouter.get('/metrics', async (_req, res) => {
+  try {
   const rows = await db
     .select({ eventType: analyticsEvents.eventType, count: sql<number>`count(*)::int` })
     .from(analyticsEvents)
@@ -49,6 +50,10 @@ adminRouter.get('/metrics', async (_req, res) => {
     push_to_view_rate_pct: pushToViewRate ? Number(pushToViewRate) : null,
     pipeline_reliability_pct: pipelineReliability ? Number(pipelineReliability) : null,
   });
+  } catch (err) {
+    console.error('metrics error:', err);
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 adminRouter.get('/feedback', async (_req, res) => {
