@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { analyticsEvents } from '../db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { analyticsEvents, docFeedback, docs } from '../db/schema';
+import { eq, sql, desc } from 'drizzle-orm';
 
 export const adminRouter = Router();
 
@@ -33,4 +33,21 @@ adminRouter.get('/metrics', async (_req, res) => {
     doc_viewed: counts.doc_viewed,
     push_to_view_rate_pct: pushToViewRate ? Number(pushToViewRate) : null,
   });
+});
+
+adminRouter.get('/feedback', async (_req, res) => {
+  const rows = await db
+    .select({
+      id: docFeedback.id,
+      docId: docFeedback.docId,
+      filePath: docs.filePath,
+      rating: docFeedback.rating,
+      comment: docFeedback.comment,
+      createdAt: docFeedback.createdAt,
+    })
+    .from(docFeedback)
+    .leftJoin(docs, eq(docFeedback.docId, docs.id))
+    .orderBy(desc(docFeedback.createdAt));
+
+  res.json(rows);
 });

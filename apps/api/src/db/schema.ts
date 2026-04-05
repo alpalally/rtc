@@ -56,6 +56,14 @@ export const repoMembers = pgTable('repo_members', {
   role: text('role').notNull().$type<'owner' | 'viewer'>(),
 });
 
+export const docFeedback = pgTable('doc_feedback', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  docId: uuid('doc_id').references(() => docs.id).notNull(),
+  rating: text('rating').notNull().$type<'up' | 'down'>(),
+  comment: text('comment'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const analyticsEvents = pgTable('analytics_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   eventType: text('event_type').notNull().$type<'app_installed' | 'push_received' | 'doc_generated' | 'doc_viewed'>(),

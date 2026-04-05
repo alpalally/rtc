@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { repos, docs, syncEvents } from '../db/schema';
+import { repos, docs, syncEvents, docFeedback } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { docSyncQueue } from '../lib/queue';
 import { trackEvent } from '../lib/analytics';
@@ -47,6 +47,23 @@ reposRouter.get('/:repoId/docs/:docId', async (req, res) => {
   if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
   await trackEvent('doc_viewed', { repoId: req.params.repoId, docId: req.params.docId });
   res.json(doc);
+});
+
+reposRouter.post('/:repoId/docs/:docId/feedback', async (req, res) => {
+  const { rating, comment } = req.body;
+  if (rating !== 'up' && rating !== 'down') {
+    res.status(400).json({ error: 'rating must be "up" or "down"' });
+    return;
+  }
+  const [doc] = await db.select().from(docs).where(eq(docs.id, req.params.docId));
+  if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const [feedback] = await db.insert(docFeedback).values({
+    docId: req.params.docId,
+    rating,
+    comment: comment ?? null,
+  }).returning();
+  res.status(201).json(feedback);
 });
 
 reposRouter.post('/:repoId/sync', async (req, res) => {
