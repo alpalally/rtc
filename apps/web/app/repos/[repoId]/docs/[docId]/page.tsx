@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { FeedbackWidget } from '../../../../components/FeedbackWidget';
+import { FeedbackWidget } from '../../../../../components/FeedbackWidget';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
