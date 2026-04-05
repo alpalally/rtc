@@ -4,6 +4,7 @@ import { webhookRouter } from './routes/webhooks';
 import { reposRouter } from './routes/repos';
 import { authRouter } from './routes/auth';
 import { eventsRouter } from './routes/events';
+import { adminRouter } from './routes/admin';
 
 const app = express();
 const PORT = process.env.API_PORT ?? 3001;
@@ -16,6 +17,7 @@ app.use('/auth', authRouter);
 app.use('/webhooks', webhookRouter);
 app.use('/api/repos', reposRouter);
 app.use('/api/events', eventsRouter);
+app.use('/api/admin', adminRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });

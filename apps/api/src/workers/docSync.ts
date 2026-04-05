@@ -5,6 +5,7 @@ import { db } from '../db';
 import { docs, syncEvents } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { connection, DocSyncJob } from '../lib/queue';
+import { trackEvent } from '../lib/analytics';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -64,12 +65,14 @@ export const docSyncWorker = new Worker<DocSyncJob>('doc-sync', async (job) => {
       const docContent = await generateDoc(content, filePath);
       const docPath = `docs/${filePath}.md`;
 
-      await db.insert(docs).values({
+      const [savedDoc] = await db.insert(docs).values({
         repoId, filePath, docPath, content: docContent, commitSha,
       }).onConflictDoUpdate({
         target: [docs.repoId, docs.filePath],
         set: { content: docContent, commitSha, updatedAt: new Date() },
-      } as Parameters<typeof db.insert>[0]['onConflictDoUpdate']);
+      } as Parameters<typeof db.insert>[0]['onConflictDoUpdate']).returning();
+
+      await trackEvent('doc_generated', { repoId, docId: savedDoc.id });
 
       updatedDocPaths.push(docPath);
     } catch (err) {

@@ -55,3 +55,12 @@ export const repoMembers = pgTable('repo_members', {
   repoId: uuid('repo_id').references(() => repos.id).notNull(),
   role: text('role').notNull().$type<'owner' | 'viewer'>(),
 });
+
+export const analyticsEvents = pgTable('analytics_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  eventType: text('event_type').notNull().$type<'app_installed' | 'push_received' | 'doc_generated' | 'doc_viewed'>(),
+  repoId: uuid('repo_id').references(() => repos.id),
+  docId: uuid('doc_id').references(() => docs.id),
+  userId: uuid('user_id').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

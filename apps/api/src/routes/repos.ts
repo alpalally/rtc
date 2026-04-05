@@ -3,6 +3,7 @@ import { db } from '../db';
 import { repos, docs, syncEvents } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { docSyncQueue } from '../lib/queue';
+import { trackEvent } from '../lib/analytics';
 
 export const reposRouter = Router();
 
@@ -44,6 +45,7 @@ reposRouter.get('/:repoId/docs', async (req, res) => {
 reposRouter.get('/:repoId/docs/:docId', async (req, res) => {
   const [doc] = await db.select().from(docs).where(eq(docs.id, req.params.docId));
   if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
+  await trackEvent('doc_viewed', { repoId: req.params.repoId, docId: req.params.docId });
   res.json(doc);
 });
 

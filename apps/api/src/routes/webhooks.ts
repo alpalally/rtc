@@ -4,6 +4,7 @@ import { db } from '../db';
 import { repos, syncEvents } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { docSyncQueue } from '../lib/queue';
+import { trackEvent } from '../lib/analytics';
 
 export const webhookRouter = Router();
 
@@ -66,6 +67,7 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
       const githubAccountId: number = payload.installation?.account?.id;
       const repoList: GithubInstallationRepo[] = payload.repositories ?? [];
       await upsertInstallationRepos(installationId, githubAccountId, repoList);
+      await trackEvent('app_installed');
     } else if (payload.action === 'deleted' && installationId) {
       // Remove all repos for this installation
       const existing = await db.select({ githubRepoId: repos.githubRepoId })
@@ -117,6 +119,8 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
       triggeredBy: 'push',
       filesChanged: changedFiles,
     }).returning();
+
+    await trackEvent('push_received', { repoId: repo.id });
 
     await docSyncQueue.add('sync', {
       repoId: repo.id,
