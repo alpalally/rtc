@@ -2,14 +2,39 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { db } from '../db';
 import { repos, syncEvents } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { docSyncQueue } from '../lib/queue';
 
 export const webhookRouter = Router();
 
+interface GithubInstallationRepo {
+  id: number;
+  name: string;
+  full_name: string;
+}
+
 function verifySignature(secret: string, payload: Buffer, signature: string): boolean {
   const expected = `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
+async function upsertInstallationRepos(
+  installationId: number,
+  repoList: GithubInstallationRepo[],
+) {
+  for (const r of repoList) {
+    const [owner, name] = r.full_name.split('/');
+    await db.insert(repos).values({
+      githubRepoId: r.id,
+      installationId,
+      owner,
+      name,
+      defaultBranch: 'main',
+    }).onConflictDoUpdate({
+      target: repos.githubRepoId,
+      set: { installationId, owner, name, updatedAt: new Date() },
+    });
+  }
 }
 
 webhookRouter.post('/github', async (req: Request, res: Response) => {
@@ -31,6 +56,41 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
   res.status(200).json({ ok: true });
 
   const payload = JSON.parse(body.toString());
+  const installationId: number = payload.installation?.id;
+
+  // GitHub App installation events — register or remove repos
+  if (event === 'installation') {
+    if (payload.action === 'created' && installationId) {
+      const repoList: GithubInstallationRepo[] = payload.repositories ?? [];
+      await upsertInstallationRepos(installationId, repoList);
+    } else if (payload.action === 'deleted' && installationId) {
+      // Remove all repos for this installation
+      const existing = await db.select({ githubRepoId: repos.githubRepoId })
+        .from(repos)
+        .where(eq(repos.installationId, installationId));
+      if (existing.length > 0) {
+        await db.delete(repos).where(
+          inArray(repos.githubRepoId, existing.map((r) => r.githubRepoId)),
+        );
+      }
+    }
+    return;
+  }
+
+  if (event === 'installation_repositories') {
+    if (payload.action === 'added' && installationId) {
+      const repoList: GithubInstallationRepo[] = payload.repositories_added ?? [];
+      await upsertInstallationRepos(installationId, repoList);
+    } else if (payload.action === 'removed' && installationId) {
+      const removed: GithubInstallationRepo[] = payload.repositories_removed ?? [];
+      if (removed.length > 0) {
+        await db.delete(repos).where(
+          inArray(repos.githubRepoId, removed.map((r) => r.id)),
+        );
+      }
+    }
+    return;
+  }
 
   if (event === 'push') {
     const repoGithubId = payload.repository?.id;

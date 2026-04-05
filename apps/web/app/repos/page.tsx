@@ -17,8 +17,10 @@ export default async function ReposPage() {
       ) : (
         <ul className="space-y-3">
           {repos.map((repo: { id: string; owner: string; name: string }) => (
-            <li key={repo.id} className="bg-gray-900 rounded-lg p-4">
-              <span className="font-mono">{repo.owner}/{repo.name}</span>
+            <li key={repo.id} className="bg-gray-900 rounded-lg p-4 hover:bg-gray-800 transition">
+              <a href={`/repos/${repo.id}`} className="font-mono hover:text-indigo-400 transition">
+                {repo.owner}/{repo.name}
+              </a>
             </li>
           ))}
         </ul>
