@@ -21,6 +21,7 @@ RUN npm ci --workspace=apps/api --omit=dev --include-workspace-root
 
 COPY --from=base /app/apps/api/dist ./apps/api/dist
 COPY --from=base /app/apps/api/src/db/migrations ./apps/api/dist/db/migrations
+COPY apps/api/scripts ./apps/api/scripts
 
 EXPOSE 3001
 
