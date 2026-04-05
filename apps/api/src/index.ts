@@ -10,7 +10,7 @@ import { eventsRouter } from './routes/events';
 import { adminRouter } from './routes/admin';
 
 const app = express();
-const PORT = process.env.API_PORT ?? 3001;
+const PORT = process.env.PORT ?? process.env.API_PORT ?? 3001;
 
 // Raw body needed for GitHub webhook signature verification
 app.use('/webhooks', express.raw({ type: 'application/json' }));
