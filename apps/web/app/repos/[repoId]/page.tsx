@@ -1,24 +1,36 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../api/auth/[...nextauth]/route';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-async function getRepo(repoId: string) {
-  const res = await fetch(`${API_URL}/api/repos/${repoId}`, { cache: 'no-store' });
+async function getRepo(repoId: string, githubId: number) {
+  const res = await fetch(`${API_URL}/api/repos/${repoId}`, {
+    cache: 'no-store',
+    headers: { 'X-Github-User-Id': String(githubId) },
+  });
   if (!res.ok) return null;
   return res.json();
 }
 
-async function getDocs(repoId: string) {
-  const res = await fetch(`${API_URL}/api/repos/${repoId}/docs`, { cache: 'no-store' });
+async function getDocs(repoId: string, githubId: number) {
+  const res = await fetch(`${API_URL}/api/repos/${repoId}/docs`, {
+    cache: 'no-store',
+    headers: { 'X-Github-User-Id': String(githubId) },
+  });
   if (!res.ok) return [];
   return res.json();
 }
 
 export default async function RepoPage({ params }: { params: { repoId: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect('/api/auth/signin');
+
+  const githubId = (session as typeof session & { githubId: number }).githubId;
   const [repo, docs] = await Promise.all([
-    getRepo(params.repoId),
-    getDocs(params.repoId),
+    getRepo(params.repoId, githubId),
+    getDocs(params.repoId, githubId),
   ]);
 
   if (!repo) notFound();

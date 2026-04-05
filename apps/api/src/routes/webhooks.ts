@@ -20,6 +20,7 @@ function verifySignature(secret: string, payload: Buffer, signature: string): bo
 
 async function upsertInstallationRepos(
   installationId: number,
+  githubAccountId: number,
   repoList: GithubInstallationRepo[],
 ) {
   for (const r of repoList) {
@@ -27,12 +28,13 @@ async function upsertInstallationRepos(
     await db.insert(repos).values({
       githubRepoId: r.id,
       installationId,
+      githubAccountId,
       owner,
       name,
       defaultBranch: 'main',
     }).onConflictDoUpdate({
       target: repos.githubRepoId,
-      set: { installationId, owner, name, updatedAt: new Date() },
+      set: { installationId, githubAccountId, owner, name, updatedAt: new Date() },
     });
   }
 }
@@ -61,8 +63,9 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
   // GitHub App installation events — register or remove repos
   if (event === 'installation') {
     if (payload.action === 'created' && installationId) {
+      const githubAccountId: number = payload.installation?.account?.id;
       const repoList: GithubInstallationRepo[] = payload.repositories ?? [];
-      await upsertInstallationRepos(installationId, repoList);
+      await upsertInstallationRepos(installationId, githubAccountId, repoList);
     } else if (payload.action === 'deleted' && installationId) {
       // Remove all repos for this installation
       const existing = await db.select({ githubRepoId: repos.githubRepoId })
@@ -79,8 +82,9 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
 
   if (event === 'installation_repositories') {
     if (payload.action === 'added' && installationId) {
+      const githubAccountId: number = payload.installation?.account?.id;
       const repoList: GithubInstallationRepo[] = payload.repositories_added ?? [];
-      await upsertInstallationRepos(installationId, repoList);
+      await upsertInstallationRepos(installationId, githubAccountId, repoList);
     } else if (payload.action === 'removed' && installationId) {
       const removed: GithubInstallationRepo[] = payload.repositories_removed ?? [];
       if (removed.length > 0) {

@@ -1,13 +1,24 @@
+import { getServerSession } from 'next-auth';
+import { redirect } from 'next/navigation';
+import { authOptions } from '../api/auth/[...nextauth]/route';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-async function getRepos() {
-  const res = await fetch(`${API_URL}/api/repos`, { cache: 'no-store' });
+async function getRepos(githubId: number) {
+  const res = await fetch(`${API_URL}/api/repos`, {
+    cache: 'no-store',
+    headers: { 'X-Github-User-Id': String(githubId) },
+  });
   if (!res.ok) return [];
   return res.json();
 }
 
 export default async function ReposPage() {
-  const repos = await getRepos();
+  const session = await getServerSession(authOptions);
+  if (!session) redirect('/api/auth/signin');
+
+  const githubId = (session as typeof session & { githubId: number }).githubId;
+  const repos = await getRepos(githubId);
 
   return (
     <main className="max-w-4xl mx-auto p-8">

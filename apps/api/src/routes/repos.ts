@@ -6,8 +6,14 @@ import { docSyncQueue } from '../lib/queue';
 
 export const reposRouter = Router();
 
-reposRouter.get('/', async (_req, res) => {
-  const all = await db.select().from(repos);
+reposRouter.get('/', async (req, res) => {
+  const githubUserIdHeader = req.headers['x-github-user-id'];
+  if (!githubUserIdHeader) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const githubAccountId = Number(githubUserIdHeader);
+  const all = await db.select().from(repos).where(eq(repos.githubAccountId, githubAccountId));
   res.json(all);
 });
 

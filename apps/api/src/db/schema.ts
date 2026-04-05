@@ -4,6 +4,7 @@ export const repos = pgTable('repos', {
   id: uuid('id').primaryKey().defaultRandom(),
   githubRepoId: bigint('github_repo_id', { mode: 'number' }).unique().notNull(),
   installationId: bigint('installation_id', { mode: 'number' }).notNull(),
+  githubAccountId: bigint('github_account_id', { mode: 'number' }),
   owner: text('owner').notNull(),
   name: text('name').notNull(),
   defaultBranch: text('default_branch').notNull().default('main'),
