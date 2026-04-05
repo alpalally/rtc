@@ -65,9 +65,17 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
   if (event === 'installation') {
     if (payload.action === 'created' && installationId) {
       const githubAccountId: number = payload.installation?.account?.id;
+      const orgName: string = payload.installation?.account?.login ?? '';
       const repoList: GithubInstallationRepo[] = payload.repositories ?? [];
       await upsertInstallationRepos(installationId, githubAccountId, repoList);
-      await trackEvent('app_installed');
+      await trackEvent('app_installed', {
+        metadata: {
+          tester_id: String(githubAccountId),
+          org_name: orgName,
+          repo_count: repoList.length,
+          installed_at: new Date().toISOString(),
+        },
+      });
     } else if (payload.action === 'deleted' && installationId) {
       // Remove all repos for this installation
       const existing = await db.select({ githubRepoId: repos.githubRepoId })
@@ -120,7 +128,15 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
       filesChanged: changedFiles,
     }).returning();
 
-    await trackEvent('push_received', { repoId: repo.id });
+    await trackEvent('push_received', {
+      repoId: repo.id,
+      metadata: {
+        tester_id: String(payload.installation?.account?.id ?? payload.sender?.id ?? ''),
+        branch: (payload.ref as string)?.replace('refs/heads/', '') ?? '',
+        commit_sha: payload.after as string ?? '',
+        pushed_at: new Date().toISOString(),
+      },
+    });
 
     await docSyncQueue.add('sync', {
       repoId: repo.id,

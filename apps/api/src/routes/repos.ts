@@ -45,7 +45,18 @@ reposRouter.get('/:repoId/docs', async (req, res) => {
 reposRouter.get('/:repoId/docs/:docId', async (req, res) => {
   const [doc] = await db.select().from(docs).where(eq(docs.id, req.params.docId));
   if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
-  await trackEvent('doc_viewed', { repoId: req.params.repoId, docId: req.params.docId });
+  const viewerId = req.headers['x-viewer-id'] as string | undefined
+    ?? req.headers['x-github-user-id'] as string | undefined
+    ?? 'anon';
+  await trackEvent('doc_viewed', {
+    repoId: req.params.repoId,
+    docId: req.params.docId,
+    metadata: {
+      viewer_id: viewerId,
+      viewed_at: new Date().toISOString(),
+      referrer: req.headers.referer ?? null,
+    },
+  });
   res.json(doc);
 });
 
@@ -63,6 +74,20 @@ reposRouter.post('/:repoId/docs/:docId/feedback', async (req, res) => {
     rating,
     comment: comment ?? null,
   }).returning();
+
+  const viewerId = req.headers['x-viewer-id'] as string | undefined
+    ?? req.headers['x-github-user-id'] as string | undefined
+    ?? 'anon';
+  await trackEvent('feedback_clicked', {
+    repoId: req.params.repoId,
+    docId: req.params.docId,
+    metadata: {
+      viewer_id: viewerId,
+      sentiment: rating,
+      clicked_at: new Date().toISOString(),
+    },
+  });
+
   res.status(201).json(feedback);
 });
 

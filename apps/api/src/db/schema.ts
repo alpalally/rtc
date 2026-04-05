@@ -1,4 +1,4 @@
-import { pgTable, uuid, bigint, text, jsonb, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, bigint, text, jsonb, timestamp, boolean } from 'drizzle-orm/pg-core';
 
 export const repos = pgTable('repos', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -66,9 +66,10 @@ export const docFeedback = pgTable('doc_feedback', {
 
 export const analyticsEvents = pgTable('analytics_events', {
   id: uuid('id').primaryKey().defaultRandom(),
-  eventType: text('event_type').notNull().$type<'app_installed' | 'push_received' | 'doc_generated' | 'doc_viewed'>(),
+  eventType: text('event_type').notNull().$type<'app_installed' | 'push_received' | 'doc_generated' | 'doc_viewed' | 'feedback_clicked'>(),
   repoId: uuid('repo_id').references(() => repos.id),
   docId: uuid('doc_id').references(() => docs.id),
   userId: uuid('user_id').references(() => users.id),
+  metadata: jsonb('metadata'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

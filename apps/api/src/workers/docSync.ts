@@ -73,11 +73,28 @@ export const docSyncWorker = new Worker<DocSyncJob>('doc-sync', async (job) => {
         set: { content: docContent, commitSha, updatedAt: new Date() },
       }).returning();
 
-      await trackEvent('doc_generated', { repoId, docId: savedDoc.id });
+      await trackEvent('doc_generated', {
+        repoId,
+        docId: savedDoc.id,
+        metadata: {
+          push_event_id: job.id,
+          generated_at: new Date().toISOString(),
+          success: true,
+        },
+      });
 
       updatedDocPaths.push(docPath);
     } catch (err) {
       console.error(`Failed to process ${filePath}:`, err);
+      await trackEvent('doc_generated', {
+        repoId,
+        metadata: {
+          push_event_id: job.id,
+          generated_at: new Date().toISOString(),
+          success: false,
+          error: (err as Error).message,
+        },
+      });
     }
   }
 

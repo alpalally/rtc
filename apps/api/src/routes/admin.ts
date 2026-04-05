@@ -16,22 +16,38 @@ adminRouter.get('/metrics', async (_req, res) => {
     push_received: 0,
     doc_generated: 0,
     doc_viewed: 0,
+    feedback_clicked: 0,
   };
 
   for (const row of rows) {
     counts[row.eventType] = row.count;
   }
 
+  // Count only successful doc_generated events for pipeline reliability
+  const [successRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(analyticsEvents)
+    .where(sql`event_type = 'doc_generated' AND metadata->>'success' = 'true'`);
+
+  const docsGeneratedSuccess = successRow?.count ?? 0;
+
   const pushToViewRate = counts.push_received > 0
     ? (counts.doc_viewed / counts.push_received * 100).toFixed(1)
+    : null;
+
+  const pipelineReliability = counts.push_received > 0
+    ? (docsGeneratedSuccess / counts.push_received * 100).toFixed(1)
     : null;
 
   res.json({
     app_installed: counts.app_installed,
     push_received: counts.push_received,
     doc_generated: counts.doc_generated,
+    doc_generated_success: docsGeneratedSuccess,
     doc_viewed: counts.doc_viewed,
+    feedback_clicked: counts.feedback_clicked,
     push_to_view_rate_pct: pushToViewRate ? Number(pushToViewRate) : null,
+    pipeline_reliability_pct: pipelineReliability ? Number(pipelineReliability) : null,
   });
 });
 
