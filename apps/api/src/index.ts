@@ -2,6 +2,7 @@ import 'dotenv/config';
 import path from 'path';
 import express from 'express';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { sql } from 'drizzle-orm';
 import { db } from './db';
 import { webhookRouter } from './routes/webhooks';
 import { reposRouter } from './routes/repos';
@@ -29,6 +30,7 @@ app.get('/health', (_req, res) => {
 async function main() {
   console.log('Running database migrations...');
   await migrate(db, { migrationsFolder: path.join(__dirname, 'db/migrations') });
+  await db.execute(sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS metadata jsonb`);
   console.log('Migrations complete.');
 
   app.listen(PORT, () => {
