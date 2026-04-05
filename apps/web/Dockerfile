@@ -22,7 +22,8 @@ COPY apps/web/package*.json ./apps/web/
 RUN npm ci --workspace=apps/web --omit=dev --include-workspace-root
 
 COPY --from=base /app/apps/web/.next ./apps/web/.next
-COPY --from=base /app/apps/web/public ./apps/web/public
+# public/ is optional — skip if it doesn't exist
+RUN mkdir -p ./apps/web/public
 
 EXPOSE 3000
 
