@@ -8,6 +8,20 @@
       "when": 1775412301238,
       "tag": "0000_busy_callisto",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1775413082000,
+      "tag": "0001_analytics_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1775413525000,
+      "tag": "0002_doc_feedback",
+      "breakpoints": true
     }
   ]
 }

@@ -20,7 +20,7 @@ COPY apps/api/package*.json ./apps/api/
 RUN npm ci --workspace=apps/api --omit=dev --include-workspace-root
 
 COPY --from=base /app/apps/api/dist ./apps/api/dist
-COPY --from=base /app/apps/api/src/db/migrations ./apps/api/src/db/migrations
+COPY --from=base /app/apps/api/src/db/migrations ./apps/api/dist/db/migrations
 
 EXPOSE 3001
 

@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import Anthropic from '@anthropic-ai/sdk';
 import { App } from '@octokit/app';
+import { Octokit as RestOctokit } from '@octokit/rest';
 import { db } from '../db';
 import { docs, syncEvents } from '../db/schema';
 import { eq } from 'drizzle-orm';
@@ -36,7 +37,7 @@ export const docSyncWorker = new Worker<DocSyncJob>('doc-sync', async (job) => {
   await db.update(syncEvents).set({ status: 'processing', startedAt: new Date() })
     .where(eq(syncEvents.id, job.id!));
 
-  const octokit = await githubApp.getInstallationOctokit(installationId);
+  const octokit = await githubApp.getInstallationOctokit(installationId) as unknown as RestOctokit;
 
   const relevantFiles = changedFiles.filter((f) =>
     SUPPORTED_EXTENSIONS.some((ext) => f.endsWith(ext))
@@ -61,7 +62,7 @@ export const docSyncWorker = new Worker<DocSyncJob>('doc-sync', async (job) => {
       });
 
       if (!('content' in fileData)) continue;
-      const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+      const content = Buffer.from(fileData.content as string, 'base64').toString('utf-8');
       const docContent = await generateDoc(content, filePath);
       const docPath = `docs/${filePath}.md`;
 
@@ -70,7 +71,7 @@ export const docSyncWorker = new Worker<DocSyncJob>('doc-sync', async (job) => {
       }).onConflictDoUpdate({
         target: [docs.repoId, docs.filePath],
         set: { content: docContent, commitSha, updatedAt: new Date() },
-      } as Parameters<typeof db.insert>[0]['onConflictDoUpdate']).returning();
+      }).returning();
 
       await trackEvent('doc_generated', { repoId, docId: savedDoc.id });
 

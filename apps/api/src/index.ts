@@ -1,5 +1,8 @@
 import 'dotenv/config';
+import path from 'path';
 import express from 'express';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { db } from './db';
 import { webhookRouter } from './routes/webhooks';
 import { reposRouter } from './routes/repos';
 import { authRouter } from './routes/auth';
@@ -23,6 +26,17 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`AgentDocs API listening on port ${PORT}`);
+async function main() {
+  console.log('Running database migrations...');
+  await migrate(db, { migrationsFolder: path.join(__dirname, 'db/migrations') });
+  console.log('Migrations complete.');
+
+  app.listen(PORT, () => {
+    console.log(`AgentDocs API listening on port ${PORT}`);
+  });
+}
+
+main().catch((err) => {
+  console.error('Startup failed:', err);
+  process.exit(1);
 });
