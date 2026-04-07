@@ -27,6 +27,12 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+// Catch unhandled async route errors in Express 4
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled route error:', err);
+  res.status(500).json({ error: err.message });
+});
+
 async function main() {
   console.log('Running database migrations...');
   await migrate(db, { migrationsFolder: path.join(__dirname, 'db/migrations') });

@@ -57,18 +57,23 @@ adminRouter.get('/metrics', async (_req, res) => {
 });
 
 adminRouter.get('/feedback', async (_req, res) => {
-  const rows = await db
-    .select({
-      id: docFeedback.id,
-      docId: docFeedback.docId,
-      filePath: docs.filePath,
-      rating: docFeedback.rating,
-      comment: docFeedback.comment,
-      createdAt: docFeedback.createdAt,
-    })
-    .from(docFeedback)
-    .leftJoin(docs, eq(docFeedback.docId, docs.id))
-    .orderBy(desc(docFeedback.createdAt));
+  try {
+    const rows = await db
+      .select({
+        id: docFeedback.id,
+        docId: docFeedback.docId,
+        filePath: docs.filePath,
+        rating: docFeedback.rating,
+        comment: docFeedback.comment,
+        createdAt: docFeedback.createdAt,
+      })
+      .from(docFeedback)
+      .leftJoin(docs, eq(docFeedback.docId, docs.id))
+      .orderBy(desc(docFeedback.createdAt));
 
-  res.json(rows);
+    res.json(rows);
+  } catch (err) {
+    console.error('feedback error:', err);
+    res.status(500).json({ error: (err as Error).message });
+  }
 });

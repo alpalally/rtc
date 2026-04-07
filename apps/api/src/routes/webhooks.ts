@@ -41,6 +41,7 @@ async function upsertInstallationRepos(
 }
 
 webhookRouter.post('/github', async (req: Request, res: Response) => {
+  try {
   const sig = req.headers['x-hub-signature-256'];
   const event = req.headers['x-github-event'];
   const body = req.body as Buffer;
@@ -146,5 +147,12 @@ webhookRouter.post('/github', async (req: Request, res: Response) => {
       owner: repo.owner,
       name: repo.name,
     }, { jobId: event_.id });
+  }
+  } catch (err) {
+    console.error('Webhook processing error:', err);
+    // Response may already be sent; only send 500 if not
+    if (!res.headersSent) {
+      res.status(500).json({ error: (err as Error).message });
+    }
   }
 });
