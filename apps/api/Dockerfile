@@ -7,6 +7,7 @@ COPY apps/api/package*.json ./apps/api/
 RUN npm ci --workspace=apps/api --include-workspace-root
 
 # Build
+ARG CACHE_BUST=1
 COPY apps/api ./apps/api
 RUN npm run build --workspace=apps/api
 
