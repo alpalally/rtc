@@ -6,9 +6,10 @@ COPY package*.json turbo.json ./
 COPY apps/api/package*.json ./apps/api/
 RUN npm ci --workspace=apps/api --include-workspace-root
 
-# Build
-ARG CACHE_BUST=1
-COPY apps/api ./apps/api
+# Build - copy only src (no stale dist from context)
+COPY apps/api/src ./apps/api/src
+COPY apps/api/tsconfig.json ./apps/api/tsconfig.json
+COPY apps/api/drizzle.config.ts ./apps/api/drizzle.config.ts
 RUN npm run build --workspace=apps/api
 
 # Production image
