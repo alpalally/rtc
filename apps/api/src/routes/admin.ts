@@ -57,49 +57,26 @@ adminRouter.get('/metrics', async (_req, res) => {
   }
 });
 
-// Temporary E2E test endpoint — generates real docs for a small set of inline files
-// and stores them in the DB so the full read-back flow can be validated.
+// Temporary E2E test endpoint — writes docs to the DB and reads them back via the HTTP API.
+// Two modes controlled by ?mode= query param:
+//   ai   — calls Claude to generate real docs (requires funded ANTHROPIC_API_KEY)
+//   stub — uses pre-written doc content (no AI call, proves DB+API pipeline)
 // DELETE this endpoint after testing is complete.
-adminRouter.post('/e2e-test', async (_req, res) => {
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+adminRouter.post('/e2e-test', async (req, res) => {
+  const mode = (req.query['mode'] as string) ?? 'ai';
+  const anthropic = mode === 'ai' ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
-  // Inline file content sampled from the actual source tree
-  const testFiles: Array<{ filePath: string; content: string }> = [
+  // Two source files from the actual repo, with hand-written stub docs
+  const testFiles: Array<{ filePath: string; sourceContent: string; stubDoc: string }> = [
     {
       filePath: 'src/lib/analytics.ts',
-      content: `import { db } from '../db';
-import { analyticsEvents } from '../db/schema';
-
-export type EventType = 'app_installed' | 'push_received' | 'doc_generated' | 'doc_viewed' | 'feedback_clicked';
-
-export async function trackEvent(
-  eventType: EventType,
-  opts: { repoId?: string; docId?: string; userId?: string; metadata?: Record<string, unknown>; } = {},
-): Promise<void> {
-  await db.insert(analyticsEvents).values({
-    eventType,
-    repoId: opts.repoId ?? null,
-    docId: opts.docId ?? null,
-    userId: opts.userId ?? null,
-    metadata: opts.metadata ?? null,
-  });
-}`,
+      sourceContent: `import { db } from '../db';\nimport { analyticsEvents } from '../db/schema';\n\nexport type EventType = 'app_installed' | 'push_received' | 'doc_generated' | 'doc_viewed' | 'feedback_clicked';\n\nexport async function trackEvent(eventType: EventType, opts: { repoId?: string; docId?: string; userId?: string; metadata?: Record<string, unknown>; } = {}): Promise<void> {\n  await db.insert(analyticsEvents).values({ eventType, repoId: opts.repoId ?? null, docId: opts.docId ?? null, userId: opts.userId ?? null, metadata: opts.metadata ?? null });\n}`,
+      stubDoc: `# analytics.ts\n\n## Purpose\nFirebase-style analytics helper that writes structured events into the \`analytics_events\` PostgreSQL table via Drizzle ORM.\n\n## Exports\n- \`EventType\` — union of the five supported event names\n- \`trackEvent(eventType, opts)\` — inserts one analytics row; all extra fields (repoId, docId, userId, metadata) are optional\n\n## Usage\n\`\`\`ts\nawait trackEvent('doc_generated', { repoId, docId, metadata: { success: true } });\n\`\`\`\n\n_Note: stub doc — AI generation skipped (no Anthropic credits)._`,
     },
     {
       filePath: 'src/lib/queue.ts',
-      content: `import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
-
-export const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  maxRetriesPerRequest: null,
-});
-
-export interface DocSyncJob {
-  repoId: string; commitSha: string; changedFiles: string[];
-  installationId: number; owner: string; name: string;
-}
-
-export const docSyncQueue = new Queue<DocSyncJob>('doc-sync', { connection });`,
+      sourceContent: `import { Queue } from 'bullmq';\nimport IORedis from 'ioredis';\n\nexport const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', { maxRetriesPerRequest: null });\n\nexport interface DocSyncJob { repoId: string; commitSha: string; changedFiles: string[]; installationId: number; owner: string; name: string; }\n\nexport const docSyncQueue = new Queue<DocSyncJob>('doc-sync', { connection });`,
+      stubDoc: `# queue.ts\n\n## Purpose\nCreates the BullMQ job queue (\`doc-sync\`) and the shared Redis connection used by both the API and the worker process.\n\n## Exports\n- \`connection\` — IORedis instance pointing at \`REDIS_URL\`\n- \`DocSyncJob\` — TypeScript interface describing a sync job payload\n- \`docSyncQueue\` — BullMQ Queue instance; call \`.add('sync', job)\` to enqueue work\n\n## Usage\n\`\`\`ts\nawait docSyncQueue.add('sync', { repoId, commitSha, changedFiles: [], installationId, owner, name });\n\`\`\`\n\n_Note: stub doc — AI generation skipped (no Anthropic credits)._`,
     },
   ];
 
@@ -120,20 +97,28 @@ export const docSyncQueue = new Queue<DocSyncJob>('doc-sync', { connection });`,
     }).returning();
     testRepoId = testRepo.id;
 
-    // 2. Generate docs with Claude
-    const generatedDocs: Array<{ filePath: string; docPath: string; content: string }> = [];
+    // 2. Generate docs (AI or stub)
+    const generatedDocs: Array<{ filePath: string; docPath: string; content: string; generatedBy: string }> = [];
     for (const file of testFiles) {
-      const message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
-        messages: [{
-          role: 'user',
-          content: `Generate concise technical documentation for this file. Include: purpose, exports/functions, usage examples where relevant.\n\nFile: ${file.filePath}\n\`\`\`\n${file.content}\n\`\`\``,
-        }],
-      });
-      const block = message.content[0];
-      const docContent = block.type === 'text' ? block.text : '';
-      generatedDocs.push({ filePath: file.filePath, docPath: `docs/${file.filePath}.md`, content: docContent });
+      let docContent: string;
+      let generatedBy: string;
+      if (mode === 'ai' && anthropic) {
+        const message = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 512,
+          messages: [{
+            role: 'user',
+            content: `Generate concise technical documentation for this file. Include: purpose, exports/functions, usage examples where relevant.\n\nFile: ${file.filePath}\n\`\`\`\n${file.sourceContent}\n\`\`\``,
+          }],
+        });
+        const block = message.content[0];
+        docContent = block.type === 'text' ? block.text : '';
+        generatedBy = 'claude-haiku-4-5-20251001';
+      } else {
+        docContent = file.stubDoc;
+        generatedBy = 'stub';
+      }
+      generatedDocs.push({ filePath: file.filePath, docPath: `docs/${file.filePath}.md`, content: docContent, generatedBy });
     }
 
     // 3. Upsert docs into DB
@@ -166,13 +151,15 @@ export const docSyncQueue = new Queue<DocSyncJob>('doc-sync', { connection });`,
 
     res.json({
       status: 'pass',
+      mode,
       repoId: testRepoId,
       filesProcessed: testFiles.length,
       docsGenerated: generatedDocs.map(d => ({
         filePath: d.filePath,
         docPath: d.docPath,
+        generatedBy: d.generatedBy,
         contentLength: d.content.length,
-        contentPreview: d.content.slice(0, 300),
+        contentPreview: d.content.slice(0, 400),
       })),
       docsReadBack: storedDocs.map(d => ({
         id: d.id,
